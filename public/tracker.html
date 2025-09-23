@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"><title>IP Tracker - Reporter</title>
+</head>
+<body>
+  <h2>Reporter / Remote Laptop</h2>
+  <p>This page will send this device's public IP (and optional browser GPS if you allow) to the tracking server.</p>
+  <label>Device ID (any short label): <input id="deviceId" placeholder="e.g., John's Laptop"></label>
+  <button id="sendBtn">Send Report</button>
+  <pre id="out"></pre>
+
+  <script>
+    async function sendReport() {
+      document.getElementById('out').textContent = 'Preparing...';
+      const deviceId = document.getElementById('deviceId').value || 'anonymous-' + Math.floor(Math.random()*10000);
+      let clientLat = null, clientLon = null;
+
+      // Try browser geolocation (more accurate) - user must allow
+      if ('geolocation' in navigator) {
+        try {
+          const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
+          });
+          clientLat = pos.coords.latitude;
+          clientLon = pos.coords.longitude;
+        } catch (err) {
+          // user denied or timeout - continue with only IP
+        }
+      }
+
+      const payload = { deviceId, label: deviceId, clientLat, clientLon };
+
+      try {
+        const r = await fetch('/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        document.getElementById('out').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    document.getElementById('sendBtn').onclick = sendReport;
+  </script>
+</body>
+</html>

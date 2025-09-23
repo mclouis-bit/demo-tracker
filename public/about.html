@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>IP Tracker - About</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; line-height: 1.6; }
+    header { padding: 10px; background: #0066cc; color: white; text-align: center; }
+    nav { padding: 8px; background: #eee; text-align: center; }
+    nav a { margin: 0 10px; text-decoration: none; font-weight: bold; color: #0066cc; }
+    section { padding: 20px; max-width: 800px; margin: auto; }
+    h2 { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>About This App</h2>
+  </header>
+  <nav>
+    <a href="index.html">Home</a> | 
+    <a href="about.html">About</a>
+  </nav>
+
+  <section>
+    <h2>How it works</h2>
+    <p>
+      This app uses <b>IP-based geolocation</b> to estimate the location of a device 
+      (like a laptop). It queries a free service (<i>ip-api.com</i>) that maps IP addresses 
+      to physical locations using ISP records, regional registries, and other data sources.
+    </p>
+
+    <h2>Accuracy</h2>
+    <ul>
+      <li><b>Country level:</b> ~99% accurate</li>
+      <li><b>Region/State:</b> fairly good, varies by country</li>
+      <li><b>City level:</b> 50–75% accurate globally</li>
+      <li><b>Street level:</b> unreliable with IP alone</li>
+    </ul>
+    <p>
+      Results include an <b>accuracy radius</b> (e.g., 50 km), shown on the map as a circle.
+    </p>
+
+    <h2>Limitations</h2>
+    <p>
+      Accuracy is affected by VPNs, proxies, mobile networks, and corporate gateways. 
+      Sometimes the location may point to the ISP’s hub rather than the exact device.
+    </p>
+
+    <h2>Privacy & Safeguards</h2>
+    <p>
+      This demo does not store your IP address. Real-world tracking apps must respect 
+      <b>user consent</b>, <b>data protection laws</b>, and use <b>minimal retention</b> of personal data.
+    </p>
+  </section>
+</body>
+</html>
