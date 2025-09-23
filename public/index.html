@@ -44,11 +44,12 @@
         markers[d.deviceId] = { marker, circle };
       });
 
-      if (devices.length) {
+      if (firstLoad && devices.length) {
         const first = devices[0];
         const fLat = first.clientLat || (first.geoip && first.geoip.lat) || 0;
         const fLon = first.clientLon || (first.geoip && first.geoip.lon) || 0;
-        map.setView([fLat,fLon], devices.length===1?12:5);
+        map.setView([fLat, fLon], devices.length === 1 ? 12 : 5);
+        firstLoad = false;
       }
     }
 
