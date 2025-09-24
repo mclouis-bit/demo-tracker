@@ -7,62 +7,95 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
     body{font-family:Arial;margin:0}
-    header{background:#0066cc;color:#fff;padding:10px;text-align:center}
-    nav{padding:8px;background:#eee;text-align:center}
+    header{background:#008080;color:#fff;padding:10px;text-align:center}
+    nav{padding:8px;background:#FF6F00;text-align:center}
     #map{height:60vh}
     #list{padding:10px}
   </style>
 </head>
 <body>
   <header><h2>IP Tracker — Dashboard</h2></header>
-  <nav><a href="index.html">Home</a> | <a href="tracker.html">Reporter (remote)</a> | <a href="about.html">About</a> | <button onclick="resetDashboard()">Reset Devices</button>button></button></nav>
+  <nav><a href="index.html">Home</a> | <a href="tracker.html">Reporter (remote)</a> | <a href="about.html">About</a> | <button onclick="resetDashboard()">Reset Devices</button></nav>
   <div id="map"></div>
   <div id="list"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
+    let layers = {};   // will store marker+circle pairs
     let firstLoad = true;
     const map = L.map('map').setView([0,0],2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let markers = {};
 
     async function refresh() {
-      const res = await fetch('/devices');
-      const devices = await res.json();
-      document.getElementById('list').innerHTML = devices.map(d => `<div><b>${d.deviceId}</b> — ${d.label || ''} — ${d.publicIP} — ${d.reportedAt}</div>`).join('');
+  const res = await fetch('/devices');
+  const devices = await res.json();
 
-      // clear markers
-      Object.values(markers).forEach(m => map.removeLayer(m.marker) || map.removeLayer(m.circle));
-      markers = {};
+  // Update device list
+  document.getElementById('list').innerHTML = devices.map(d =>
+    `<div><b>${d.deviceId}</b> — ${d.label || ''} — ${d.publicIP} — ${d.reportedAt}</div>`
+  ).join('');
 
-      devices.forEach(d => {
-        const lat = d.clientLat || (d.geoip && d.geoip.lat) || null;
-        const lon = d.clientLon || (d.geoip && d.geoip.lon) || null;
-        if (!lat || !lon) return;
-        const marker = L.marker([lat, lon]).addTo(map);
-        const circle = L.circle([lat, lon], { radius: d.clientLat ? 50 : 50000, color: d.clientLat ? 'green' : 'blue', fillOpacity: 0.15 }).addTo(map);
-        marker.bindPopup(`<b>${d.label || d.deviceId}</b><br>IP: ${d.publicIP}<br>Reported: ${d.reportedAt}<br>Source: ${d.clientLat ? 'Browser GPS' : 'IP Geolocation'}`);
-        markers[d.deviceId] = { marker, circle };
-      });
+  // Remove old markers + circles
+  Object.values(layers).forEach(layer => {
+    map.removeLayer(layer.marker);
+    map.removeLayer(layer.circle);
+  });
+  layers = {};
 
-      if (firstLoad && devices.length) {
-        const first = devices[0];
-        const fLat = first.clientLat || (first.geoip && first.geoip.lat) || 0;
-        const fLon = first.clientLon || (first.geoip && first.geoip.lon) || 0;
-        map.setView([fLat, fLon], devices.length === 1 ? 12 : 5);
-        firstLoad = false;
-      }
-    }
+  // Add new markers + circles
+  devices.forEach(d => {
+    const lat = d.clientLat || (d.geoip && d.geoip.lat) || null;
+    const lon = d.clientLon || (d.geoip && d.geoip.lon) || null;
+    if (!lat || !lon) return;
+
+    const marker = L.marker([lat, lon]).addTo(map);
+    const circle = L.circle([lat, lon], {
+      radius: d.clientLat ? 50 : 50000,
+      color: d.clientLat ? 'green' : 'blue',
+      fillOpacity: 0.15
+    }).addTo(map);
+
+    marker.bindPopup(`
+      <b>${d.label || d.deviceId}</b><br>
+      IP: ${d.publicIP}<br>
+      Reported: ${d.reportedAt}<br>
+      Source: ${d.clientLat ? 'Browser GPS' : 'IP Geolocation'}
+    `);
+
+    // Save marker+circle together
+    layers[d.deviceId] = { marker, circle };
+  });
+
+  // Only auto-center once
+  if (firstLoad && devices.length) {
+    const first = devices[0];
+    const fLat = first.clientLat || (first.geoip && first.geoip.lat) || 0;
+    const fLon = first.clientLon || (first.geoip && first.geoip.lon) || 0;
+    map.setView([fLat, fLon], devices.length === 1 ? 12 : 5);
+    firstLoad = false;
+  }
+}
+
 
     // refresh every 10s
     refresh();
     setInterval(refresh, 10000);
-    async function resetDashboard(){
-      if (confirm("Are you sure you want to clear all devices?")){
-        await fetch('/reset', {method: 'POST'});
-        refresh();
-      }
-    }
+    async function resetDashboard() {
+  if (confirm("Are you sure you want to clear all devices?")) {
+    await fetch('/reset', { method: 'POST' });
+
+    // Clear map immediately
+    Object.values(layers).forEach(layer => {
+      map.removeLayer(layer.marker);
+      map.removeLayer(layer.circle);
+    });
+    layers = {};
+
+    // Refresh device list (now empty)
+    refresh();
+  }
+}
   </script>
 </body>
 </html>
