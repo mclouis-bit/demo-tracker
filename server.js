@@ -67,4 +67,10 @@ app.get('/devices/:id', (req, res) => {
 // Simple static file serve for demo pages (index.html, tracker.html, about.html)
 app.use(express.static('public'));
 
+app.post('/reset', (req, res) => {
+  devices = {};
+  res.json({ ok: true, message: "All devices cleared." });
+});
+
+
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
