@@ -57,10 +57,10 @@
     refresh();
     setInterval(refresh, 10000);
     async function resetDashboard(){
-      if (confirm("Are you sure you want to clear all devices?"){
+      if (confirm("Are you sure you want to clear all devices?")){
         await fetch('/reset', {method: 'POST'});
         refresh();
-      })
+      }
     }
   </script>
 </body>
