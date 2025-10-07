@@ -1,9 +1,9 @@
 // server.js
-const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./devices.db');
+const Database = require('better-sqlite3');
+const db = new Database('./devices.db');
 
-// Create table if it doesn't exist
-db.run(`
+// Create table if it doesn’t exist
+db.prepare(`
   CREATE TABLE IF NOT EXISTS devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     deviceId TEXT,
@@ -13,8 +13,7 @@ db.run(`
     clientLon REAL,
     reportedAt TEXT
   )
-`);
-
+`).run();
 
 const express = require('express');
 const fetch = require('node-fetch'); // npm i node-fetch@2
@@ -50,15 +49,12 @@ app.post('/report', async (req, res) => {
   // Save in memory
   devices[deviceId] = { deviceId, label, clientLat, clientLon, publicIP, reportedAt };
 
-  // Save in database
-  db.run(
-    `INSERT INTO devices (deviceId, label, publicIP, clientLat, clientLon, reportedAt)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [deviceId, label, publicIP, clientLat, clientLon, reportedAt],
-    (err) => {
-      if (err) console.error("DB insert error:", err.message);
-    }
-  );
+const insert = db.prepare(`
+  INSERT INTO devices (deviceId, label, publicIP, clientLat, clientLon, reportedAt)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+insert.run(deviceId, label, publicIP, clientLat, clientLon, reportedAt);
+
 
   res.json({ ok: true });
 });
@@ -79,10 +75,8 @@ app.get('/devices/:id', (req, res) => {
 
 // Get all stored devices from DB (history)
 app.get('/history', (req, res) => {
-  db.all(`SELECT * FROM devices ORDER BY reportedAt DESC`, [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
-  });
+  const rows = db.prepare(`SELECT * FROM devices ORDER BY reportedAt DESC`).all();
+res.json(rows);
 });
 
 
