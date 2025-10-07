@@ -1,4 +1,21 @@
 // server.js
+const sqlite3 = require('sqlite3').verbose();
+const db = new sqlite3.Database('./devices.db');
+
+// Create table if it doesn't exist
+db.run(`
+  CREATE TABLE IF NOT EXISTS devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    deviceId TEXT,
+    label TEXT,
+    publicIP TEXT,
+    clientLat REAL,
+    clientLon REAL,
+    reportedAt TEXT
+  )
+`);
+
+
 const express = require('express');
 const fetch = require('node-fetch'); // npm i node-fetch@2
 const bodyParser = require('body-parser');
@@ -27,29 +44,25 @@ async function geoip(ip) {
 // Endpoint for remote device to POST its info
 // payload: { deviceId, label (optional), clientLat, clientLon }
 app.post('/report', async (req, res) => {
-  const { deviceId, label } = req.body;
-  // get reporter IP (public IP as seen by server)
-  const reporterIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  // if IPv6 format like ::ffff:41.23. etc, normalize
-  const ip = reporterIP.replace(/^::ffff:/, '');
-  const clientLat = req.body.clientLat || null;
-  const clientLon = req.body.clientLon || null;
+  const { deviceId, label, clientLat, clientLon, publicIP } = req.body;
+  const reportedAt = new Date().toISOString();
 
-  const ipinfo = await geoip(ip);
+  // Save in memory
+  devices[deviceId] = { deviceId, label, clientLat, clientLon, publicIP, reportedAt };
 
-  const entry = {
-    deviceId: deviceId || `dev-${Date.now()}`,
-    label: label || null,
-    reportedAt: new Date().toISOString(),
-    publicIP: ip,
-    clientLat,
-    clientLon,
-    geoip: ipinfo
-  };
-  devices[entry.deviceId] = entry;
+  // Save in database
+  db.run(
+    `INSERT INTO devices (deviceId, label, publicIP, clientLat, clientLon, reportedAt)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [deviceId, label, publicIP, clientLat, clientLon, reportedAt],
+    (err) => {
+      if (err) console.error("DB insert error:", err.message);
+    }
+  );
 
-  res.json({ ok: true, entry });
+  res.json({ ok: true });
 });
+
 
 // Return all devices
 app.get('/devices', (req, res) => {
@@ -63,6 +76,15 @@ app.get('/devices/:id', (req, res) => {
   if (!devices[id]) return res.status(404).json({ error: 'not found' });
   res.json(devices[id]);
 });
+
+// Get all stored devices from DB (history)
+app.get('/history', (req, res) => {
+  db.all(`SELECT * FROM devices ORDER BY reportedAt DESC`, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
 
 // Simple static file serve for demo pages (index.html, tracker.html, about.html)
 app.use(express.static('public'));

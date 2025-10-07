@@ -15,7 +15,7 @@
 </head>
 <body>
   <header><h2>IP Tracker — Dashboard</h2></header>
-  <nav><a href="index.html">Home</a> | <a href="tracker.html">Reporter (remote)</a> | <a href="about.html">About</a> | <button onclick="resetDashboard()">Reset Devices</button></nav>
+  <nav><a href="index.html">Home</a> | <a href="tracker.html">Reporter (remote)</a> | <a href="about.html">About</a> | <button onclick="resetDashboard()">Reset Devices</button> | <button onclick="loadHistory()">View History</button></nav>
   <div id="map"></div>
   <div id="list"></div>
 
@@ -91,6 +91,17 @@
       map.removeLayer(layer.circle);
     });
     layers = {};
+
+    async function loadHistory() {
+  const res = await fetch('/history');
+  const history = await res.json();
+
+  // Show history in list area
+  document.getElementById('list').innerHTML = history.map(d =>
+    `<div><b>${d.deviceId}</b> — ${d.label || ''} — ${d.publicIP} — ${d.reportedAt}</div>`
+  ).join('');
+}
+
 
     // Refresh device list (now empty)
     refresh();
