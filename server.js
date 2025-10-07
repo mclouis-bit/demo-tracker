@@ -1,6 +1,6 @@
 // server.js
 // -------------------------------------------------------------
-// TRACKING APP SERVER - Safe version with optional database
+// TRACKING APP SERVER - MySQL Version (Render compatible)
 // -------------------------------------------------------------
 
 const express = require("express");
@@ -8,6 +8,7 @@ const fetch = require("node-fetch"); // npm i node-fetch@2
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require("path");
+const mysql = require("mysql2/promise"); // npm i mysql2
 
 const app = express();
 app.use(cors());
@@ -17,29 +18,40 @@ app.use(express.static("public")); // serve index.html, tracker.html, etc.
 const PORT = process.env.PORT || 3000;
 
 // -------------------------------------------------------------
-// DATABASE SETUP (optional)
+// DATABASE SETUP (MySQL)
 // -------------------------------------------------------------
-let db = null;
-try {
-  const Database = require("better-sqlite3");
-  db = new Database(path.join(__dirname, "devices.db"));
+let db;
 
-  db.prepare(`
-    CREATE TABLE IF NOT EXISTS devices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      deviceId TEXT,
-      label TEXT,
-      publicIP TEXT,
-      clientLat REAL,
-      clientLon REAL,
-      reportedAt TEXT
-    )
-  `).run();
+async function initDB() {
+  try {
+    db = await mysql.createConnection({
+      host: process.env.MYSQL_HOST || "localhost",
+      user: process.env.MYSQL_USER || "root",
+      password: process.env.MYSQL_PASSWORD || "",
+      database: process.env.MYSQL_DB || "tracking_app",
+    });
 
-  console.log("✅ Database initialized successfully.");
-} catch (err) {
-  console.warn("⚠️ Database unavailable — running in memory-only mode:", err.message);
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS devices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        deviceId VARCHAR(255),
+        label VARCHAR(255),
+        publicIP VARCHAR(50),
+        clientLat DOUBLE,
+        clientLon DOUBLE,
+        reportedAt DATETIME
+      )
+    `);
+
+    console.log("✅ MySQL Database connected and initialized.");
+  } catch (err) {
+    console.error("❌ MySQL connection failed:", err.message);
+    db = null;
+  }
 }
+
+// Initialize the DB when server starts
+initDB();
 
 // -------------------------------------------------------------
 // IN-MEMORY STORE (for live session)
@@ -79,13 +91,14 @@ app.post("/report", async (req, res) => {
     reportedAt,
   };
 
-  // Save in database (if available)
+  // Save in MySQL database (if available)
   if (db) {
     try {
-      db.prepare(
+      await db.execute(
         `INSERT INTO devices (deviceId, label, publicIP, clientLat, clientLon, reportedAt)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(deviceId, label, publicIP, clientLat, clientLon, reportedAt);
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [deviceId, label, publicIP, clientLat, clientLon, reportedAt]
+      );
     } catch (err) {
       console.error("DB insert error:", err.message);
     }
@@ -106,23 +119,18 @@ app.get("/devices/:id", (req, res) => {
   res.json(devices[id]);
 });
 
-// 📜 Return all stored devices from database (if available)
-app.get("/history", (req, res) => {
-  if (!db) {
-    return res.status(503).json({
-      error: "Database not available on this server instance.",
-    });
-  }
+// 📜 Return all stored devices from MySQL (if connected)
+app.get("/history", async (req, res) => {
+  if (!db)
+    return res.status(503).json({ error: "Database not connected." });
 
   try {
-    const rows = db
-      .prepare("SELECT * FROM devices ORDER BY reportedAt DESC")
-      .all();
+    const [rows] = await db.execute(
+      "SELECT * FROM devices ORDER BY reportedAt DESC"
+    );
     res.json(rows);
   } catch (err) {
-    res
-      .status(500)
-      .json({ error: "Database query failed", details: err.message });
+    res.status(500).json({ error: "Database query failed", details: err.message });
   }
 });
 
@@ -137,4 +145,7 @@ app.post("/reset", (req, res) => {
 
 // -------------------------------------------------------------
 // START SERVER
-// --------
+// -------------------------------------------------------------
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
