@@ -33,12 +33,12 @@
   <script>
     let layers = {};
     let firstLoad = true;
-    let viewMode = "live"; // "live" or "history"
+    let viewMode = "live"; 
 
     const map = L.map('map').setView([0, 0], 2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // -------------------- REFRESH LIVE DEVICES --------------------
+    //REFRESH LIVE DEVICES
     async function refresh() {
       if (viewMode !== "live") return; // do nothing if viewing history
 
@@ -86,10 +86,10 @@
       }
     }
 
-    // Refresh every 10s (live mode only)
+    //Refresh every 10s (live mode only)
     setInterval(refresh, 10000);
 
-    // -------------------- RESET DASHBOARD --------------------
+    //RESET DASHBOARD
     async function resetDashboard() {
       if (confirm("Are you sure you want to clear all devices?")) {
         await fetch('/reset', { method: 'POST' });
@@ -105,11 +105,10 @@
       }
     }
 
-    // -------------------- LOAD HISTORY --------------------
+    //LOAD HISTORY
     async function loadHistory() {
       viewMode = "history";
-      document.getElementById("backLiveBtn").style.display = "inline"; // show back button
-
+      document.getElementById("backLiveBtn").style.display = "inline"; 
       const res = await fetch('/history');
       const history = await res.json();
 
@@ -154,24 +153,25 @@
         layers[d.deviceId] = { marker, circle };
       });
     }
+    
+async function backToLive() {
+  viewMode = "live";
+  document.getElementById("backLiveBtn").style.display = "none"; // hide button
+  document.getElementById('list').innerHTML = "<em>Switched to live mode...</em>";
 
-    // -------------------- BACK TO LIVE VIEW --------------------
-    function backToLive() {
-      viewMode = "live";
-      document.getElementById("backLiveBtn").style.display = "none"; // hide button
-      document.getElementById('list').innerHTML = "<em>Switched to live mode...</em>";
+  await fetch('/reset', { method: 'POST' });
 
-      // Clear all markers and re-run live refresh
-      Object.values(layers).forEach(layer => {
-        map.removeLayer(layer.marker);
-        map.removeLayer(layer.circle);
-      });
-      layers = {};
-      firstLoad = true;
-      refresh();
-    }
+  Object.values(layers).forEach(layer => {
+    map.removeLayer(layer.marker);
+    map.removeLayer(layer.circle);
+  });
+  layers = {};
+  firstLoad = true;
 
-    // -------------------- INITIALIZE --------------------
+  refresh();
+}
+
+
     refresh();
   </script>
 </body>
