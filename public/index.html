@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
     body { font-family: Arial; margin: 0 }
-    header { background: #008080; color: #fff; padding: 10px; text-align: center }
+    header { background: #14c7c7; color: #81e2ad; padding: 10px; text-align: center }
     nav { padding: 8px; background: #FF6F00; text-align: center }
     #map { height: 60vh }
     #list { padding: 10px }
@@ -22,7 +22,8 @@
     <a href="tracker.html">Reporter (remote)</a> |
     <a href="about.html">About</a> |
     <button onclick="resetDashboard()">Reset Devices</button> |
-    <button onclick="loadHistory()">View History</button>
+    <button onclick="loadHistory()">View History</button> |
+    <button id="backLiveBtn" onclick="backToLive()" style="display:none;">Back to Live View</button>
   </nav>
 
   <div id="map"></div>
@@ -32,11 +33,15 @@
   <script>
     let layers = {};
     let firstLoad = true;
+    let viewMode = "live"; // "live" or "history"
+
     const map = L.map('map').setView([0, 0], 2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     // -------------------- REFRESH LIVE DEVICES --------------------
     async function refresh() {
+      if (viewMode !== "live") return; // do nothing if viewing history
+
       const res = await fetch('/devices');
       const devices = await res.json();
 
@@ -44,14 +49,12 @@
         `<div><b>${d.deviceId}</b> — ${d.label || ''} — ${d.publicIP} — ${d.reportedAt}</div>`
       ).join('');
 
-      // Clear old markers
       Object.values(layers).forEach(layer => {
         map.removeLayer(layer.marker);
         map.removeLayer(layer.circle);
       });
       layers = {};
 
-      // Add new markers
       devices.forEach(d => {
         const lat = d.clientLat || (d.geoip && d.geoip.lat);
         const lon = d.clientLon || (d.geoip && d.geoip.lon);
@@ -74,7 +77,6 @@
         layers[d.deviceId] = { marker, circle };
       });
 
-      // Auto-center first load
       if (firstLoad && devices.length) {
         const first = devices[0];
         const fLat = first.clientLat || (first.geoip && first.geoip.lat) || 0;
@@ -84,12 +86,14 @@
       }
     }
 
+    // Refresh every 10s (live mode only)
+    setInterval(refresh, 10000);
+
     // -------------------- RESET DASHBOARD --------------------
     async function resetDashboard() {
       if (confirm("Are you sure you want to clear all devices?")) {
         await fetch('/reset', { method: 'POST' });
 
-        // Clear map layers
         Object.values(layers).forEach(layer => {
           map.removeLayer(layer.marker);
           map.removeLayer(layer.circle);
@@ -103,6 +107,9 @@
 
     // -------------------- LOAD HISTORY --------------------
     async function loadHistory() {
+      viewMode = "history";
+      document.getElementById("backLiveBtn").style.display = "inline"; // show back button
+
       const res = await fetch('/history');
       const history = await res.json();
 
@@ -111,20 +118,21 @@
         return;
       }
 
-      // Clear current layers
+      // Clear map
       Object.values(layers).forEach(layer => {
         map.removeLayer(layer.marker);
         map.removeLayer(layer.circle);
       });
       layers = {};
 
-      // Show history on the map
+      // Populate list
       document.getElementById('list').innerHTML = "<h3>Device History</h3>" + history.map(d =>
         `<div><b>${d.deviceid || d.deviceId}</b> — ${d.label || ''}<br>
         IP: ${d.publicip || d.publicIP}<br>
         Reported: ${new Date(d.reportedat || d.reportedAt).toLocaleString()}</div>`
       ).join('<hr>');
 
+      // Add markers
       history.forEach(d => {
         const lat = d.clientlat || d.clientLat;
         const lon = d.clientlon || d.clientLon;
@@ -147,9 +155,24 @@
       });
     }
 
+    // -------------------- BACK TO LIVE VIEW --------------------
+    function backToLive() {
+      viewMode = "live";
+      document.getElementById("backLiveBtn").style.display = "none"; // hide button
+      document.getElementById('list').innerHTML = "<em>Switched to live mode...</em>";
+
+      // Clear all markers and re-run live refresh
+      Object.values(layers).forEach(layer => {
+        map.removeLayer(layer.marker);
+        map.removeLayer(layer.circle);
+      });
+      layers = {};
+      firstLoad = true;
+      refresh();
+    }
+
     // -------------------- INITIALIZE --------------------
     refresh();
-    setInterval(refresh, 10000);
   </script>
 </body>
 </html>
